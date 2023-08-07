@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Captura de Artículos</title>
+    <meta charset="UTF-8">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src='/WSClient.js'></script>
+    <script>
+        var URL = "/Servicio/rest/ws";
+        var foto = "";
+
+        function muestra_pantalla(id) {
+            $("#menu").hide();
+            $("#" + id).show();
+        }
+
+        function oculta_pantalla(id) {
+            $("#" + id).hide();
+            $("#menu").show();
+
+            if (id === "compra_articulos" || id === "carrito") {
+                var resultadoDiv = document.getElementById("resultado_busqueda");
+                resultadoDiv.innerHTML = "";
+                get("buscar_palabra").value = "";
+            }
+
+        }
+
+        function get(id) {
+            return document.getElementById(id);
+        }
+
+        function readSingleFile(files, imagen) {
+            var file = files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                imagen.src = reader.result;
+                // reader.result incluye al principio: "data:image/jpeg;base64,"
+                foto = reader.result.split(',')[1];
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function guardarArticulo() {
+            var cliente = new WSClient(URL);
+            var articulo = {
+                nombre: get("nombre_articulo").value,
+                descripcion: get("descripcion_articulo").value,
+                precio: parseFloat(get("precio_articulo").value),
+                cantidad: parseInt(get("cantidad_almacen").value),
+                fotografia: foto
+            };
+            cliente.postJson(
+                "guardar_articulo",
+                {
+                    articulo: articulo
+                },
+                function (code, result) {
+                    if (code == 200)
+                        alert("Artículo guardado correctamente");
+                    else
+                        alert(JSON.stringify(result));
+                }
+            );
+        }
+
+        function limpiaCapturaArticulo() {
+            get("nombre_articulo").value = "";
+            get("descripcion_articulo").value = "";
+            get("precio_articulo").value = "";
+            get("cantidad_almacen").value = "";
+            get("imagen_articulo").src = "/sin_foto.png";
+            foto = "";
+        }
+
+        function buscarArticulos() {
+            var palabra = get("buscar_palabra").value;
+
+            var cliente = new WSClient(URL);
+            cliente.postJson(
+                "consulta_articulo",
+                {
+                    palabraClave: palabra
+                },
+                function (code, result) {
+                    if (code == 200) {
+                        mostrarResultadoBusqueda(result);
+                    } else {
+                        alert(JSON.stringify(result));
+                    }
+                }
+            );
+        }
+
+        function mostrarResultadoBusqueda(articulos) {
+            var resultadoDiv = document.getElementById("resultado_busqueda");
+            resultadoDiv.innerHTML = "";
+
+            if (articulos.length > 0) {
+                for (var i = 0; i < articulos.length; i++) {
+                    var articulo = articulos[i];
+                    var divArticulo = document.createElement("div");
+
+                    // Agregar imagen
+                    var imagen = document.createElement("img");
+                    imagen.src = "data:image/jpeg;base64," + articulo.fotografia;
+                    imagen.width = 100;
+                    divArticulo.appendChild(imagen);
+
+                    // Agregar nombre
+                    var nombre = document.createElement("p");
+                    nombre.textContent = articulo.nombre;
+                    divArticulo.appendChild(nombre);
+
+                    // Agregar precio
+                    var precio = document.createElement("p");
+                    precio.textContent = "Precio: $" + articulo.precio.toFixed(2);
+                    divArticulo.appendChild(precio);
+
+                    // Agregar campo de cantidad
+                    var cantidadInput = document.createElement("input");
+                    cantidadInput.type = "number";
+                    cantidadInput.value = 1;
+                    cantidadInput.min = 1;
+                    divArticulo.appendChild(cantidadInput);
+
+                    // Agregar botón de comprar
+                    var comprarButton = document.createElement("button");
+                    comprarButton.textContent = "Compra";
+                    comprarButton.onclick = function () {
+                        var cantidad = parseInt(cantidadInput.value);
+                        comprarArticulo(articulo.id, cantidad);
+                    };
+                    divArticulo.appendChild(comprarButton);
+
+                    // Agregar botón de descripción
+                    var descripcionButton = document.createElement("button");
+                    descripcionButton.textContent = "Descripción";
+                    descripcionButton.onclick = (function (articulo) {
+                        return function () {
+                            mostrarDescripcion(articulo.descripcion);
+                        };
+                    })(articulo);
+                    divArticulo.appendChild(descripcionButton);
+
+                    resultadoDiv.appendChild(divArticulo);
+                }
+            } else {
+                resultadoDiv.textContent = "No se encontraron resultados.";
+            }
+        }
+
+        function mostrarDescripcion(descripcion) {
+            var descripcionDiv = document.createElement("div");
+            descripcionDiv.id = "descripcion_popup";
+            descripcionDiv.style.position = "fixed";
+            descripcionDiv.style.top = "50%";
+            descripcionDiv.style.left = "50%";
+            descripcionDiv.style.transform = "translate(-50%, -50%)";
+            descripcionDiv.style.background = "#fff";
+            descripcionDiv.style.padding = "20px";
+            descripcionDiv.style.border = "1px solid #ccc";
+            descripcionDiv.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.15)";
+
+            var descripcionText = document.createElement("p");
+            descripcionText.textContent = descripcion;
+
+            var cerrarButton = document.createElement("button");
+            cerrarButton.textContent = "Cerrar";
+            cerrarButton.onclick = function () {
+                descripcionDiv.remove();
+            };
+
+            descripcionDiv.appendChild(descripcionText);
+            descripcionDiv.appendChild(cerrarButton);
+            document.body.appendChild(descripcionDiv);
+        }
+
+        function comprarArticulo(articulo, cantidad) {
+            var cliente = new WSClient(URL);
+            var compra = {
+                idArticulo: articulo,
+                cantidadCompra: cantidad
+            };
+            cliente.postJson(
+                "realizar_compra",
+                compra,
+                function (code, result) {
+                    if (code == 200) {
+                        alert("Compra realizada correctamente.");
+                    } else {
+                        alert(JSON.stringify(result));
+                    }
+                }
+            );
+        }
+
+
+        function mostrarArticulosEnCarrito() {
+
+            var cliente = new WSClient(URL);
+            cliente.postJson(
+                "articulos_carrito",
+                {hola: "hola"},
+                function (code, result) {
+                    if (code == 200) {
+                        mostarResultadosArticulosEnCarrito(result);
+                    } else {
+                        alert(JSON.stringify(result));
+                    }
+                }
+
+            );
+        }
+
+
+        function mostarResultadosArticulosEnCarrito(articulos) {
+            oculta_pantalla('compra_articulos');
+            muestra_pantalla('carrito');
+            var carritoDiv = document.getElementById("articulos_en_carrito");
+            carritoDiv.innerHTML = "";
+            var totalCompra = 0;
+
+            if (articulos.length > 0) {
+                for (var i = 0; i < articulos.length; i++) {
+                    var articulo = articulos[i];
+
+                    // Crear div para cada artículo en el carrito
+                    var divArticulo = document.createElement("div");
+
+                    // Agregar imagen
+                    var imagen = document.createElement("img");
+                    imagen.src = "data:image/jpeg;base64," + articulo.fotografia;
+                    imagen.width = 100;
+                    divArticulo.appendChild(imagen);
+
+                    // Agregar nombre
+                    var nombre = document.createElement("p");
+                    nombre.textContent = articulo.nombre;
+                    divArticulo.appendChild(nombre);
+
+                    // Agregar cantidad
+                    var cantidadLabel = document.createElement("label");
+                    cantidadLabel.textContent = "Cantidad: ";
+                    divArticulo.appendChild(cantidadLabel);
+
+                    var cantidadInput = document.createElement("input");
+                    cantidadInput.type = "number";
+                    cantidadInput.value = articulo.cantidad;
+                    cantidadInput.addEventListener("change", (function (articulo) {
+                        return function (event) {
+                            var newQuantity = parseInt(event.target.value);
+                            updateCartItemQuantity(articulo.id, newQuantity);
+                        };
+                    })(articulo));
+                    divArticulo.appendChild(cantidadInput);
+
+                    // Agregar precio
+                    var precio = document.createElement("p");
+                    precio.textContent = "Precio: $" + articulo.precio;
+                    divArticulo.appendChild(precio);
+
+                    // Calcular costo
+                    var costo = articulo.precio * articulo.cantidad;
+                    totalCompra += costo;
+
+                    // Agregar costo
+                    var costoTexto = document.createElement("p");
+                    costoTexto.textContent = "Costo: $" + costo.toFixed(2);
+                    divArticulo.appendChild(costoTexto);
+
+                    // Agregar botón de eliminar artículo
+                    var eliminarButton = document.createElement("button");
+                    eliminarButton.textContent = "Eliminar artículo";
+                    eliminarButton.onclick = (function (articulo) {
+                        return function () {
+                            mostrarConfirmacionEliminarArticulo(articulo);
+                        };
+                    })(articulo);
+                    divArticulo.appendChild(eliminarButton);
+
+                    carritoDiv.appendChild(divArticulo);
+                }
+            } else {
+                var mensaje = document.createElement("p");
+                mensaje.textContent = "No hay artículos en el carrito.";
+                carritoDiv.appendChild(mensaje);
+            }
+
+            // Agregar total de compra
+            var totalCompraTexto = document.createElement("p");
+            totalCompraTexto.textContent = "Total de la compra: $" + totalCompra.toFixed(2);
+            carritoDiv.appendChild(totalCompraTexto);
+
+            // Agregar botón de regresar
+            var regresarButton = document.createElement("button");
+            regresarButton.textContent = "Regresar";
+            regresarButton.onclick = function () {
+                oculta_pantalla('carrito');
+                muestra_pantalla('compra_articulos');
+            };
+            carritoDiv.appendChild(regresarButton);
+        }
+
+        function updateCartItemQuantity(articuloId, newQuantity) {
+            var cliente = new WSClient(URL);
+            cliente.postJson(
+                "actualizar_cantidad_articulo",
+                {idArticulo: articuloId, nuevaCantidad: newQuantity},
+                function (code, result) {
+                    if (code == 200) {
+                        alert("Cantidad actualizada correctamente");
+                    } else {
+                        alert(JSON.stringify(result));
+                    }
+                }
+            );
+        }
+
+        function mostrarConfirmacionEliminarArticulo(articulo) {
+            var carritoDiv = document.getElementById("articulos_en_carrito");
+
+            var confirmacionDiv = document.createElement("div");
+            confirmacionDiv.style.position = "fixed";
+            confirmacionDiv.style.top = "50%";
+            confirmacionDiv.style.left = "50%";
+            confirmacionDiv.style.background = "#fff";
+            confirmacionDiv.style.transform = "translate(-50%, -50%)";
+            confirmacionDiv.style.border = "1px solid #ccc";
+            confirmacionDiv.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.15)";
+
+            // Agregar nombre del artículo
+            var nombre = document.createElement("p");
+            nombre.textContent = "Eliminar " + articulo.nombre;
+            confirmacionDiv.appendChild(nombre);
+
+            // Agregar cantidad comprada
+            var cantidad = document.createElement("p");
+            cantidad.textContent = "Cantidad comprada: " + articulo.cantidad;
+            confirmacionDiv.appendChild(cantidad);
+
+            // Agregar botón "Sí"
+            var botonSi = document.createElement("button");
+            botonSi.textContent = "Sí";
+            botonSi.onclick = function () {
+                confirmacionDiv.remove();
+                eliminarArticuloDelCarrito(articulo.id);
+            };
+            confirmacionDiv.appendChild(botonSi);
+
+            // Agregar botón "No"
+            var botonNo = document.createElement("button");
+            botonNo.textContent = "No";
+            botonNo.onclick = function () {
+                confirmacionDiv.remove();
+            };
+            confirmacionDiv.appendChild(botonNo);
+
+            carritoDiv.appendChild(confirmacionDiv);
+        }
+
+        function eliminarArticuloDelCarrito(articuloId) {
+            var cliente = new WSClient(URL);
+            cliente.postJson(
+                "eliminar_articulo_carrito",
+                {idArticulo: articuloId},
+                function (code, result) {
+                    if (code == 200) {
+                        alert("Artículo eliminado correctamente");
+                        actualizarArticulosEnCarrito();
+                    } else {
+                        alert(JSON.stringify(result));
+                    }
+                }
+            );
+        }
+
+        function actualizarArticulosEnCarrito() {
+            var carritoDiv = document.getElementById("articulos_en_carrito");
+            carritoDiv.remove();
+            mostrarArticulosEnCarrito();
+        }
+
+
+    </script>
+</head>
+
+<body>
+    <div style="width:250px;margin:auto">
+        <div id="carrito" style="display:none">
+            <h2 style="text-align:center">Artículos en el carrito</h2>
+            <div id="articulos_en_carrito"></div>
+        </div>
+
+        <div id="menu">
+            <h2 style="text-align:center">Menú Principal</h2>
+            <button type="button" onclick="muestra_pantalla('captura_articulos')"
+                style="width:250px;height:40px">Captura de artículo</button><br>
+            <button type="button" onclick="muestra_pantalla('compra_articulos')" style="width:250px;height:40px">Compra
+                de artículos</button><br>
+        </div>
+
+        <div id="captura_articulos" style="display:none">
+            <h2 style="text-align:center">Captura de artículo</h2>
+            Nombre del artículo *<br>
+            <input type="text" id="nombre_articulo" value="" style="width:250px" /><br>
+            Descripción del artículo *<br>
+            <textarea id="descripcion_articulo" style="width:250px"></textarea><br>
+            Precio *<br>
+            <input type="number" id="precio_articulo" value="" style="width:250px" /><br>
+            Cantidad en almacén *<br>
+            <input type="number" id="cantidad_almacen" value="" style="width:250px" /><br>
+            Fotografía del artículo<br>
+            <img id="imagen_articulo" width="100px" src="/sin_foto.png"><br>
+            <input type="file" id="foto_articulo" accept="image/*"
+                onchange="readSingleFile(this.files, get('imagen_articulo'))"><br>
+            <button type="button" onclick="guardarArticulo()">Guardar artículo</button>
+            <button type="button" onclick="limpiaCapturaArticulo()">Limpiar campos</button>
+            <button type="button" onclick="oculta_pantalla('captura_articulos')">Regresar</button>
+        </div>
+
+        <div id="compra_articulos" style="display:none">
+            <h2 style="text-align:center">Compra de artículos</h2>
+            <button type="button" onclick="mostrarArticulosEnCarrito()">Carrito de compra</button>
+            <input type="text" id="buscar_palabra" placeholder="Buscar por palabra" style="width:250px" />
+            <button type="button" onclick="buscarArticulos()">Buscar</button>
+            <div id="resultado_busqueda"></div>
+            <button type="button" onclick="oculta_pantalla('compra_articulos')">Regresar</button>
+        </div>
+
+
+    </div>
+</body>
+
+</html>

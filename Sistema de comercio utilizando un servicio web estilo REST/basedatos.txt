@@ -1,0 +1,19 @@
+CREATE DATABASE comercio;
+
+USE comercio;
+
+CREATE TABLE articulos (
+  id_articulo INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(100) NOT NULL,
+  descripcion VARCHAR(100) NOT NULL,
+  precio INT NOT NULL,
+  cantidad INT NOT NULL,
+  fotografia LONGBLOB NOT NULL
+);
+
+
+CREATE TABLE carrito_compra (
+  id_articulo INT NOT NULL,
+  cantidad_compra INT NOT NULL,
+  FOREIGN KEY (id_articulo) REFERENCES articulos (id_articulo)
+);
